@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import argparse, os, os.path, sqlite3, time, datetime, re
+import argparse, os, os.path, sqlite3, time, datetime, re, shutil, hashlib
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--datadir", metavar="DIRECTORY", help="path to Shotwell's private data", default=os.path.join(os.getenv("XDG_DATA_HOME",default=os.path.join(os.getenv("HOME", default="~"),"local","share")),"shotwell"))
@@ -47,7 +47,8 @@ with sqlite3.connect(dbpath) as conn:
         def move(oldpath,newpath):
             def movefile():
                 os.makedirs(os.path.dirname(newpath),exist_ok=True)
-                os.rename(oldpath,newpath)
+                #os.rename(oldpath,newpath)
+                shutil.move(oldpath,newpath)
             def moveentry():
                 (count,) = conn.execute("SELECT COUNT(*) FROM "+tablename+" WHERE filename=?",[newpath]).fetchone()
                 if count > 0:
@@ -62,8 +63,15 @@ with sqlite3.connect(dbpath) as conn:
                 if newexists:
                     # both exist
                     print("Collision: " + oldpath + " & " + newpath)
-                    flagitem(oldpath)
-                    flagitem(newpath)
+                    oldmd5 = hashlib.md5(open(oldpath, 'rb').read()).hexdigest()
+                    newmd5 = hashlib.md5(open(newpath, 'rb').read()).hexdigest()
+                    print("MD5s: " + oldmd5 + " vs " + newmd5)
+                    if oldmd5 == newmd5:
+                        print("Files are the same, moving...")
+                        moveentry()
+                    else:
+                        flagitem(oldpath)
+                        flagitem(newpath)
                 else:
                     # can move old to new
                     print ("Moving: "+oldpath+" to "+newpath)
